@@ -1,0 +1,48 @@
+body {
+    margin: 0;
+}
+
+::-webkit-scrollbar {
+    width: 7px;
+    height: 7px;
+    transition: opacity 120ms ease-out;
+}
+
+::-webkit-scrollbar-track {
+    background-color: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: var(--bg-color-secondary);
+    z-index: 100;
+    border-radius: 5px;
+    transition: 0.3s background-color;
+}
+
+::-webkit-scrollbar-corner {
+    background-color: transparent;
+    z-index: 100;
+}
+
+
+:root {
+    --bg-color-root: #ebeff6;
+    --bg-color-primary: #fdfeff;
+    --bg-color-secondary: #bfc7d7;
+    --border-color-primary: rgb(244, 246, 250);
+    --border-color-secondary: #e4eaf1;
+    --border-color-tertiary: rgb(223, 229, 239);
+    --text-color-primary: #000000;
+    --text-color-secondary: rgb(0, 0, 0);
+}
+
+html.dark {
+    --bg-color-root: #181b20;
+    --bg-color-primary: #1f2329;
+    --bg-color-secondary: #626d7c;
+    --border-color-primary: rgb(42, 47, 55);
+    --border-color-secondary: #363246;
+    --border-color-tertiary: rgb(62, 69, 81);
+    --text-color-primary: #ffffff;
+    --text-color-secondary: rgb(141, 152, 170);
+}

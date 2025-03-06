@@ -1,0 +1,26 @@
+project(HttpServer)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_C_STANDARD 11)
+
+set(EXECUTABLE_OUTPUT_PATH ${PROJECT_ROOT_DIR}/output)
+aux_source_directory(. MAIN_SRC)
+list(APPEND MAIN_SRC
+        ${MAIN_SRC}
+        ${U_SOCKETS_SRC})
+add_executable(${PROJECT_NAME} ${MAIN_SRC}
+        ../../plugin_core/src/Logger.cpp)
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_options(${PROJECT_NAME} PUBLIC -g -O0)
+endif ()
+target_compile_definitions(${PROJECT_NAME} PRIVATE PLUGINS_DIR="${PROJECT_ROOT_DIR}/output/plugins")
+target_include_directories(${PROJECT_NAME} PUBLIC ${MAIN_INCLUDE})
+target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_ROOT_DIR}/plugin_core/include)
+target_link_directories(${PROJECT_NAME} PUBLIC ${PROJECT_ROOT_DIR}/output/lib)
+target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_ROOT_DIR}/rapidjson/include/rapidjson)
+target_link_libraries(${PROJECT_NAME} PUBLIC msinsight)
+message(STATUS "LIB:${MSINSIGHT_LIB}")
+target_link_libraries(${PROJECT_NAME} PUBLIC ${MSINSIGHT_LIB})
+target_link_libraries(${PROJECT_NAME} PUBLIC uv_a)
+if (CMAKE_SYSTEM_NAME MATCHES "Linux")
+    target_link_libraries(${PROJECT_NAME} PUBLIC stdc++fs)
+endif ()

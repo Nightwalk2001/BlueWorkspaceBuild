@@ -1,0 +1,266 @@
+.lossContainer {
+    background-color: var(--bg-color-primary);
+    height: calc(100% - 32px);
+    width: calc(100% - 32px);
+    margin: 16px;
+    overflow: hidden;
+    border-radius: 5px;
+
+    .tagSelect {
+        display: inline;
+        width: calc(100% - 79px);
+        padding: 20px;
+        position: fixed;
+        background-color: var(--bg-color-primary);
+        color: var(--text-color-primary);
+        border-bottom: 1px solid var(--border-color-primary);
+        border-radius: 5px;
+        z-index: 1000;
+        min-width: 1280px;
+
+        .item {
+            display: inline-flex;
+
+            .label {
+                flex: 1;
+                white-space: pre;
+                height: 32px;
+                line-height: 32px;
+            }
+
+            .select {
+                width: 400px;
+                margin-right: 20px;
+            }
+
+            .numInput {
+                width: 120px;
+            }
+
+            .checkBox {
+                margin-right: 20px;
+                height: 32px;
+                line-height: 32px;
+            }
+        }
+
+        .upload {
+            display: inline;
+            margin-left: 30px;
+            text-align: center;
+        }
+    }
+
+    .main {
+        height: calc(100% - 50px);
+        padding-top: 72px;
+        overflow: auto;
+        background: var(--bg-color-primary);
+
+        .noData {
+            width: 100%;
+            height: calc(100vh - 100px);
+            line-height: calc(100vh - 100px);
+            text-align: center;
+            font-size: 30px;
+            color: var(--text-color-primary);
+        }
+
+        .chartsContainer {
+            .title {
+                padding: 6px 24px;
+                background: var(--border-color-primary);
+                color: var(--text-color-primary);
+                font-weight: 500;
+                font-size: 16px;
+            }
+
+            .chartContainer {
+                display: flex;
+                margin: 0 20px;
+                height: 400px;
+                padding-top: 30px;
+
+                .fileList {
+                    width: 240px;
+                    height: 100%;
+                    overflow: auto;
+
+                    .ant-checkbox-group {
+                        display: inline;
+                    }
+
+                    .checkboxGroup {
+                        .checkboxItem {
+                            margin-right: 20px;
+                            border-radius: 4px;
+
+                            .ant-checkbox-wrapper {
+                                width: 100%;
+
+                                span:first-child {
+                                    min-width: 16px;
+                                }
+
+                                span:last-child {
+                                    width: 100%;
+                                    overflow: hidden;
+                                    white-space: nowrap;
+                                    text-overflow: ellipsis;
+                                }
+                            }
+
+                            .checkedFirst {
+                                .ant-checkbox-inner {
+                                    background-color: rgba(84, 112, 198, 1);
+                                    border-color: rgba(84, 112, 198, 1);
+
+                                }
+                            }
+
+                            .checkedSecond {
+                                .ant-checkbox-inner {
+                                    background-color: rgba(145, 204, 117, 1);
+                                    border-color: rgba(145, 204, 117, 1);
+
+                                }
+                            }
+                        }
+                    }
+                }
+
+                .chart {
+                    flex: 1;
+                    min-width: 360px;
+                    height: 100%;
+                }
+
+                .table {
+                    flex: 1;
+                    max-width: 540px;
+                    height: 100%;
+
+                    .downloadBtn {
+                        position: relative;
+                        top: -40px;
+                    }
+                }
+            }
+
+            .comparisonChart {
+
+                .title {
+                    padding: 6px 24px;
+                    background: var(--border-color-primary);
+                    color: var(--text-color-primary);
+                    font-weight: 500;
+                    font-size: 16px;
+                }
+
+                .comparisonChartContainer {
+                    margin: 0 20px;
+                    padding-top: 30px;
+                    display: flex;
+                    height: 400px;
+
+                    .dataInfo {
+                        width: 240px;
+
+                        .item {
+                            position: relative;
+                            top: 25%;
+                            padding: 10px 0;
+                            color: var(--text-color-primary);
+
+                            .fileName {
+                                text-indent: 2em;
+                                overflow: hidden;
+                                white-space: nowrap;
+                                text-overflow: ellipsis;
+                            }
+                        }
+                    }
+
+                    .chart {
+                        flex: 1;
+                        min-width: 360px;
+                    }
+
+                    .table {
+                        flex: 1;
+                        max-width: 540px;
+
+                        .downloadBtn {
+                            position: relative;
+                            top: -40px;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+.pollGetNewFileForm {
+    .dir {
+        padding-left: 10px;
+        font-size: 16px;
+        border-radius: 10px;
+    }
+
+    .checkboxGroup {
+        label {
+            width: 100%;
+        }
+    }
+}
+
+.smoothingConfig {
+    margin-right: 20px;
+
+    .item {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        margin-bottom: 4px;
+
+        .label {
+            flex: 1;
+            line-height: 22px;
+            color: var(--text-color-primary);
+        }
+
+        .select {
+            width: calc(100% - 90px);
+        }
+    }
+}
+
+.chartTooltip {
+    background-color: var(--bg-color-primary) !important;
+    border-color: var(--bg-color-primary) !important;
+    color: var(--text-color-primary) !important;
+
+    .tooltip {
+        .tooltipItem {
+            display: grid;
+            grid-template-columns: 20px 1fr 1fr;
+
+            .circle {
+                width: 10px;
+                min-width: 10px;
+                height: 10px;
+                margin: auto;
+                border-radius: 5px;
+            }
+
+            .value {
+                flex: 1;
+            }
+
+            .smoothing {
+                flex: 1;
+            }
+        }
+    }
+}

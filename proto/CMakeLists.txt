@@ -1,0 +1,6 @@
+project(PROTO_GENERATE)
+message(STATUS ${PROJECT_ROOT_DIR})
+file(GLOB_RECURSE PROTO_FILE "${PROJECT_ROOT_DIR}/proto/*.proto")
+message(.)
+ms_protobuf_generate(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR} PROTO_SRC PROTO_H ${PROTO_FILE})
+

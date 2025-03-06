@@ -1,0 +1,16 @@
+project(msinsight)
+
+aux_source_directory(./src CORE_SRC)
+set(LIBRARY_OUTPUT_PATH ${PROJECT_ROOT_DIR}/output/lib)
+add_library(${PROJECT_NAME} SHARED ${CORE_SRC})
+target_include_directories(${PROJECT_NAME} PUBLIC ./include)
+target_include_directories(${PROJECT_NAME} PRIVATE ./src)
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_libraries(${PROJECT_NAME} PRIVATE dl)
+    target_link_libraries(${PROJECT_NAME} PRIVATE stdc++fs)
+endif ()
+target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_ROOT_DIR}/rapidjson/include/rapidjson)
+
+if (${CMAKE_BUILD_TYPE} MATCHES "Debug")
+    target_compile_options(${PROJECT_NAME} PRIVATE -g -O0)
+endif ()

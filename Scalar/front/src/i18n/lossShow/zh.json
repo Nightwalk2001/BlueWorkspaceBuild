@@ -1,0 +1,28 @@
+{
+    "lossShow": {
+        "importFile": "导入文件",
+        "fileExplorer": "文件资源管理器",
+        "folderChange": "当前文件夹有变更，请选择需要合并的文件",
+        "exportFile": "导出",
+        "tagList": "需要显示的tag",
+        "tagListplaceholder": "请选择需要显示的tag",
+        "updateFrequency": "数据更新频率（s）",
+        "dataSize": "共{{total}}条数据",
+        "itemsPerPage": "/ 页",
+        "dataComparison": "数据对比",
+        "baselineData": "基线数据",
+        "comparativeData": "对比数据",
+        "noData": "暂无数据",
+        "prevPage": "下一页",
+        "nextPage": "上一页",
+        "tagAggregation": "tag聚合",
+        "algorithmPlaceholder": "请选择算法",
+        "comparisonNormal": "正常对比",
+        "comparisonAbsolute": "绝对对比",
+        "comparisonRelative": "相对对比(%)",
+        "zoom":"区域缩放",
+        "zoomReset": "区域缩放还原",
+        "restore": "还原",
+        "algorithm": "平滑算法"
+    }
+}

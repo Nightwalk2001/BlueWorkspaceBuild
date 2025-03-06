@@ -1,0 +1,15 @@
+[workspace]
+members = ["rust/*"]
+resolver = "3"
+
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+opt-level = 1
+
+[workspace.dependencies]
+ahash = "0.8.11"
+mimalloc = "0.1.43"
+serde = "1.0.218"
+smartstring = "1.0.1"

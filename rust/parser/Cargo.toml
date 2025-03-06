@@ -1,0 +1,18 @@
+[package]
+name = "parser"
+version = "0.1.0"
+edition = "2024"
+
+[package.metadata.rust-analyzer]
+warnings = ["unused_doc_comments"]
+
+[dependencies]
+prost = { version = "0.13.5" }
+smartstring = { workspace = true, features = ["serde"] }
+ahash = { workspace = true, features = ["serde"] }
+ryu = "1.0.19"
+itoa = "1.0.14"
+serde = { workspace = true, features = ["derive"] }
+
+[build-dependencies]
+prost-build = { version = "0.13.5" }

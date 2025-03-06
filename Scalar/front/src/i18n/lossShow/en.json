@@ -1,0 +1,28 @@
+{
+    "lossShow": {
+        "importFile": "Import File",
+        "fileExplorer": "File Explorer",
+        "folderChange": "The current folder has been changed, please select the files that need to be merged",
+        "exportFile": "Export",
+        "tagList": "Need Display Tag",
+        "tagListplaceholder": "Please select the tag to be displayed",
+        "updateFrequency": "Data Update Frequency(s)",
+        "dataSize": "Total {{total}} items",
+        "itemsPerPage": "/ page",
+        "dataComparison": "Data Comparison",
+        "baselineData": "Base lineData",
+        "comparativeData": "Comparative Data",
+        "noData": "No Data",
+        "prevPage": "Previous Page",
+        "nextPage": "Next Page",
+        "tagAggregation": "Tag Aggregation",
+        "algorithmPlaceholder": "Please select the algorithm",
+        "comparisonNormal": "Comparison Normal",
+        "comparisonAbsolute": "Comparison Absolute",
+        "comparisonRelative": "Comparison Relative(%)",
+        "zoom":"Zoom",
+        "zoomReset": "Zoom Reset",
+        "restore": "Restore",
+        "algorithm": "Smoothing Algorithm"
+    }
+}

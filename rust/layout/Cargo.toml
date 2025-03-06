@@ -1,0 +1,12 @@
+[package]
+name = "layout"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+mimalloc = {workspace = true}
+smallvec = { version = "2.0.0-alpha.10", features = ["serde", "std"] }
+ahash = {workspace = true, features = ["serde"]}
+
+[dev-dependencies]
+perf = {path = "../perf"}

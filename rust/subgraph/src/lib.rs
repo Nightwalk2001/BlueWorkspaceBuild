@@ -1,3 +1,6 @@
+/*
+ * Copyright (c), Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ */
 pub mod gspan;
 pub use gspan::*;
 
@@ -5,16 +8,16 @@ pub mod io;
 pub use io::*;
 
 pub mod strategy;
+use parser::{Model, Node, parse_geir_model, parse_mindir_model, parse_onnx_model};
 pub use strategy::*;
 
-use parser::{parse_geir_model, parse_mindir_model, parse_onnx_model, Model, Node};
-use crate::models::graph::Graph;
-use crate::result::JSONResult;
-use crate::strategy::{config::Config, mining_strategy::MiningStrategy, gspan_mining::GSpanMining};
-use crate::gspan::result::OutType;
-use crate::io::model_graph::ModelGraph;
-use crate::io::node::Node as ModelNode;
-
+use crate::{
+    gspan::result::OutType,
+    io::{model_graph::ModelGraph, node::Node as ModelNode},
+    models::graph::Graph,
+    result::JSONResult,
+    strategy::{config::Config, gspan_mining::GSpanMining, mining_strategy::MiningStrategy},
+};
 
 impl From<parser::Model> for ModelGraph {
     fn from(model: Model) -> Self {
@@ -22,7 +25,11 @@ impl From<parser::Model> for ModelGraph {
             name: model.name.to_string(),
             nodes: model.nodes.into_iter().map(|(k, v)| (k.to_string(), v.into())).collect(),
             edges: model.edges.into_iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
-            parameters: model.parameters.into_iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+            parameters: model
+                .parameters
+                .into_iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
         }
     }
 }
@@ -39,7 +46,11 @@ impl From<Node> for ModelNode {
 
 macro_rules! subgraph_command {
     ($func_name:ident, $parse_func:ident) => {
-        pub fn $func_name(path: &str, min_inner_support: usize, max_vertices: usize) -> Option<Vec<JSONResult>> {
+        pub fn $func_name(
+            path: &str,
+            min_inner_support: usize,
+            max_vertices: usize,
+        ) -> Option<Vec<JSONResult>> {
             let raw = $parse_func(path)?;
             let model_graph = ModelGraph::from(raw);
 

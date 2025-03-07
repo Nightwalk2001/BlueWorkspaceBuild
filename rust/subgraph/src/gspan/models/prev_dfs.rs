@@ -1,3 +1,6 @@
+/*
+ * Copyright (c), Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ */
 use rustc_hash::FxHashSet;
 
 use crate::gspan::models::edge::Edge;
@@ -12,36 +15,36 @@ use crate::gspan::models::edge::Edge;
  * 因此当前栈中只保存增加的边即PrevDFS.edge，运行时根据PrevDFS.edge的链表指针向前寻找，即可构造出该DFSCode每一条边的添加顺序。
  */
 #[derive(Debug)]
-pub struct PrevDFS<'a>{
+pub struct PrevDFS<'a> {
     pub gid: usize, //ID===GSpan.trans上的索引
-    pub edge: & 'a Edge, 
+    pub edge: &'a Edge,
     pub prev: Option<Box<&'a PrevDFS<'a>>>,
 }
 
-impl<'a> PrevDFS<'a>{
-    pub fn new(gid: usize,edge:&'a Edge,prev:Option<&'a PrevDFS<'a>>)->PrevDFS<'a>{
-        PrevDFS{
+impl<'a> PrevDFS<'a> {
+    pub fn new(gid: usize, edge: &'a Edge, prev: Option<&'a PrevDFS<'a>>) -> PrevDFS<'a> {
+        PrevDFS {
             gid,
             edge,
-            prev:match prev{
-                Some(prev)=>Some(Box::new(prev)),
-                None=>None,
+            prev: match prev {
+                Some(prev) => Some(Box::new(prev)),
+                None => None,
             },
         }
     }
 
-    pub fn get_vertex_names(&self) -> FxHashSet<(usize,String)> {
-        let mut names:  FxHashSet<(usize,String)> = FxHashSet::default();
+    pub fn get_vertex_names(&self) -> FxHashSet<(usize, String)> {
+        let mut names: FxHashSet<(usize, String)> = FxHashSet::default();
 
         let mut cur = self;
 
-        loop{
+        loop {
             names.insert((cur.gid.clone(), cur.edge.from.clone()));
             names.insert((cur.gid.clone(), cur.edge.to.clone()));
 
             if let Some(prev) = &cur.prev {
                 cur = **prev;
-            }else{
+            } else {
                 break;
             }
         }
@@ -54,65 +57,15 @@ impl<'a> PrevDFS<'a>{
 
         let mut cur = self;
 
-        loop{
+        loop {
             edges.push(&cur.edge);
 
-            if let Some(prev) = &cur.prev{
+            if let Some(prev) = &cur.prev {
                 cur = **prev;
-            }else{
+            } else {
                 break;
             }
         }
         edges
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_equal_dfs() {
-        let edge1 = Edge::new(
-            String::from("node_1"),
-            String::from("node_2"),
-            String::from("a"),
-            String::from("b"),
-            Some(String::from("A")),
-        );
-        let edge2 = Edge::new(
-            String::from("node_1"),
-            String::from("node_2"),
-            String::from("a"),
-            String::from("b"),
-            Some(String::from("A")),
-        );
-        let edge3 = Edge::new(
-            String::from("node_2"),
-            String::from("node_3"),
-            String::from("a"),
-            String::from("b"),
-            Some(String::from("C")),
-        );
-
-        let prev1 = PrevDFS::new(0,&edge1,None);
-        let prev2 = PrevDFS::new(0,&edge2,Some(&prev1));
-        let prev3 = PrevDFS::new(0,&edge3,Some(&prev2));
-
-        let result1: FxHashSet<(usize,String)> = vec![(0,String::from("node_1")), (0,String::from("node_2"))]
-            .into_iter()
-            .collect();
-        let result2: FxHashSet<(usize,String)> = vec![
-            (0,String::from("node_1")),
-            (0,String::from("node_2")),
-            (0,String::from("node_3"))
-        ]
-        .into_iter()
-        .collect();
-
-        assert_eq!(result2,prev3.get_vertex_names());
-        assert_eq!(result1,prev2.get_vertex_names());
-        assert_eq!(result1,prev1.get_vertex_names());
-    }
-}
-

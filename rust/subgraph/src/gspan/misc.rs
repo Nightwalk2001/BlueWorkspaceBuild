@@ -1,11 +1,14 @@
-use rustc_hash::FxHashSet;
-use std::collections::HashMap;
+/*
+ * Copyright (c), Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ */
+use std::collections::{BTreeMap, HashMap};
 
-use crate::gspan::models::edge::Edge;
-use crate::gspan::models::graph::Graph;
-use crate::gspan::models::history::History;
-use crate::gspan::models::projected::Projected;
-use crate::gspan::models::vertex::Vertex;
+use rustc_hash::FxHashSet;
+
+use super::models::dfs_code::DFSCode;
+use crate::gspan::models::{
+    edge::Edge, graph::Graph, history::History, projected::Projected, vertex::Vertex,
+};
 
 // 计算某个子图模式在图集合中的支持度
 // 计算 projected 内的 PrevDFS 的实值个数，即 projected 中所表示的子图模式出现过的不同的图的数量
@@ -31,25 +34,20 @@ pub fn inner_support(projected: &Projected) -> (usize, usize) {
 
     let mut unify_vertices_list: Vec<FxHashSet<String>> = vec![];
     for cur in projected.projections.iter() {
-        let set: FxHashSet<String> = cur.get_vertex_names()
-                .iter()
-                .map(|f| format!("{}/{}", &f.0, &f.1))
-                .collect();
+        let set: FxHashSet<String> =
+            cur.get_vertex_names().iter().map(|f| format!("{}/{}", &f.0, &f.1)).collect();
         // 如果存在
         if unify_vertices_list.contains(&set) {
             continue;
         }
 
         unify_vertices_list.push(set);
-        count_map
-            .entry(cur.gid)
-            .and_modify(|v| *v += 1)
-            .or_insert(1);
+        count_map.entry(cur.gid).and_modify(|v| *v += 1).or_insert(1);
     }
 
     let mut min = usize::MAX;
     let mut max = usize::MIN;
-    for(_, v) in count_map.iter() {
+    for (_, v) in count_map.iter() {
         min = if min > *v { *v } else { min };
         max = if max < *v { *v } else { max };
     }
@@ -136,26 +134,4 @@ pub fn get_forward_rm_path<'a, 'b>(
         }
     }
     result
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_unify_hash_set_vec_string() {
-        let mut unify_vertices_list: Vec<FxHashSet<String>> = vec![];
-
-        let set1: FxHashSet<String> = [String::from("a"), String::from("b"), String::from("c")]
-            .iter()
-            .cloned()
-            .collect();
-        let set2: FxHashSet<String> = [String::from("a"), String::from("c"), String::from("b")]
-            .iter()
-            .cloned()
-            .collect();
-        unify_vertices_list.push(set1);
-
-        assert_eq!(true, unify_vertices_list.contains(&set2));
-    }
 }

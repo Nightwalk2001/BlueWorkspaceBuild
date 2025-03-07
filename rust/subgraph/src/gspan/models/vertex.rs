@@ -1,5 +1,7 @@
-use crate::gspan::models::edge::Edge;
-use crate::io::node::Node;
+/*
+ * Copyright (c), Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ */
+use crate::{gspan::models::edge::Edge, io::node::Node};
 
 #[derive(Debug, Clone)]
 pub struct Vertex {
@@ -27,12 +29,7 @@ impl Vertex {
     }
 
     pub fn to_str_repr(&self) -> String {
-        vec![
-            "v".to_string(),
-            self.name.to_string(),
-            self.label.to_string(),
-        ]
-        .join(" ")
+        vec!["v".to_string(), self.name.to_string(), self.label.to_string()].join(" ")
     }
 
     pub fn from(node: &Node) -> Vertex {
@@ -60,7 +57,7 @@ mod tests {
     fn test_add_edge() {
         let mut v1 = Vertex::new(String::from("node_1"), Some(String::from("2")));
         assert_eq!(v1.edges.len(), 0);
-        assert_eq!(v1.label,"2");
+        assert_eq!(v1.label, "2");
         let e1 = Edge::new(
             v1.name.clone(),
             String::from("node_2"),

@@ -1,3 +1,6 @@
+/*
+ * Copyright (c), Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ */
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Debug, Clone)]
@@ -11,7 +14,7 @@ pub struct Edge {
 }
 
 impl Edge {
-    pub const NIL_E_LABEL: &str = "<NIL>";
+    pub const NIL_E_LABEL: &'static str = "<NIL>";
 
     pub fn new(
         from: String,
@@ -33,6 +36,7 @@ impl Edge {
             },
         }
     }
+
     pub fn to_str_repr(&self) -> String {
         vec![
             "e".to_string(),

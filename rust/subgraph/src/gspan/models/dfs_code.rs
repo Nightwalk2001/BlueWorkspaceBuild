@@ -1,9 +1,13 @@
-use crate::gspan::models::dfs::DFS;
-use crate::gspan::models::graph::Graph;
-use crate::gspan::result::MaxDFSCodeGraphResult;
+/*
+ * Copyright (c), Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ */
 use std::collections::HashSet;
 
 use super::projected::Projected;
+use crate::gspan::{
+    models::{dfs::DFS, graph::Graph},
+    result::MaxDFSCodeGraphResult,
+};
 
 /**
  * DFSCode 的本质是图中所有边的信息的排列，每条边上记录顶点 ID、顶点和边的Label。
@@ -18,10 +22,7 @@ pub struct DFSCode {
 
 impl DFSCode {
     pub fn new() -> DFSCode {
-        DFSCode {
-            is_push_result: false,
-            dfs_vec: Vec::with_capacity(32),
-        }
+        DFSCode { is_push_result: false, dfs_vec: Vec::with_capacity(32) }
     }
 
     pub fn push(
@@ -33,16 +34,18 @@ impl DFSCode {
         to_label: String,
     ) {
         self.is_push_result = false;
-        self.dfs_vec
-            .push(DFS::from(from, to, from_label, e_label, to_label));
+        self.dfs_vec.push(DFS::from(from, to, from_label, e_label, to_label));
     }
 
-    pub fn pop_with_set_result(&mut self, projected: &Projected) -> Option<DFS> {
+    pub fn pop_with_set_result(
+        &mut self,
+        projected: &Projected,
+        result: &mut MaxDFSCodeGraphResult,
+    ) -> Option<DFS> {
         if !self.is_push_result {
             // 记录尽可能远的深度搜索的结果
-            let singleton = MaxDFSCodeGraphResult::get_instance();
             // println!("pop {} {} {:?}", singleton.min_sup, singleton.inner_min_sup, singleton.out);
-            self.is_push_result = singleton.add_value(self, projected);
+            self.is_push_result = result.add_value(self, projected);
         }
         return self.dfs_vec.pop();
     }
@@ -102,27 +105,9 @@ mod tests {
 
     // 辅助函数用于创建 Edge 并添加到 DFSCode 中
     fn create_and_add_edges(dfs_code: &mut DFSCode) {
-        dfs_code.push(
-            1,
-            2,
-            String::from("a"),
-            String::from("A"),
-            String::from("b"),
-        );
-        dfs_code.push(
-            2,
-            3,
-            String::from("b"),
-            String::from("A"),
-            String::from("c"),
-        );
-        dfs_code.push(
-            2,
-            1,
-            String::from("b"),
-            String::from("B"),
-            String::from("a"),
-        );
+        dfs_code.push(1, 2, String::from("a"), String::from("A"), String::from("b"));
+        dfs_code.push(2, 3, String::from("b"), String::from("A"), String::from("c"));
+        dfs_code.push(2, 1, String::from("b"), String::from("B"), String::from("a"));
     }
 
     #[test]
@@ -156,10 +141,6 @@ e 2 1 b a B"#,
             .join(",");
 
         // 使用有意义的错误消息
-        assert_eq!(
-            "1,0", rm_path_str,
-            "Expected RMPath to be '1,0', but found '{}'",
-            rm_path_str
-        );
+        assert_eq!("1,0", rm_path_str, "Expected RMPath to be '1,0', but found '{}'", rm_path_str);
     }
 }

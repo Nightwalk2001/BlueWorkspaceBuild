@@ -1,10 +1,12 @@
-use crate::gspan::models::edge::Edge;
-use crate::gspan::models::vertex::Vertex;
-use crate::io::model_graph::ModelGraph;
-use crate::io::node::Node;
-use std::collections::HashMap;
-use std::fmt;
-use std::fs;
+/*
+ * Copyright (c), Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ */
+use std::{collections::HashMap, fmt, fs};
+
+use crate::{
+    gspan::models::{edge::Edge, vertex::Vertex},
+    io::{model_graph::ModelGraph, node::Node},
+};
 
 #[derive(Debug)]
 pub struct GraphSetParseError {
@@ -41,8 +43,7 @@ impl Graph {
     }
 
     pub fn insert_vertex(&mut self, name: &str, label: &str) {
-        self.vertex_name_label_map
-            .insert(name.to_string(), label.to_string());
+        self.vertex_name_label_map.insert(name.to_string(), label.to_string());
         let vertex = Vertex::new(name.to_string(), Some(label.to_string()));
         self.vertices.push(vertex);
     }
@@ -51,13 +52,8 @@ impl Graph {
         for (from, to, e_label) in data {
             if let Some(f_vertex) = self.vertices.iter_mut().find(|x| x.name == from) {
                 if let Some(to_label) = self.vertex_name_label_map.get(&to) {
-                    let edge = Edge::new(
-                        from,
-                        to,
-                        f_vertex.label.clone(),
-                        to_label.to_string(),
-                        e_label,
-                    );
+                    let edge =
+                        Edge::new(from, to, f_vertex.label.clone(), to_label.to_string(), e_label);
                     f_vertex.push(edge);
                     self.edge_size += 1;
                 } else {
@@ -77,8 +73,7 @@ impl Graph {
 
     fn push_node(&mut self, node: &Node) {
         let vertex = Vertex::from(node);
-        self.vertex_name_label_map
-            .insert(vertex.name.clone(), vertex.label.clone());
+        self.vertex_name_label_map.insert(vertex.name.clone(), vertex.label.clone());
         self.vertices.push(vertex);
     }
 
@@ -126,10 +121,7 @@ impl Graph {
 }
 
 impl Graph {
-    pub fn graph_from_file(
-        filename: &str,
-        directed: bool,
-    ) -> Result<Graph, GraphSetParseError> {
+    pub fn graph_from_file(filename: &str, directed: bool) -> Result<Graph, GraphSetParseError> {
         //读取文件内容
         match fs::read_to_string(filename) {
             Ok(json_content) => {
@@ -159,7 +151,7 @@ impl Graph {
         }
     }
 
-    pub fn graph_from_model_graph(model_graph: ModelGraph, directed: bool,) -> Graph {
+    pub fn graph_from_model_graph(model_graph: ModelGraph, directed: bool) -> Graph {
         let node_map = model_graph.nodes;
         let mut graph = Graph::new(0, directed);
         graph.name = model_graph.name;
@@ -203,7 +195,7 @@ mod tests {
 
     #[test]
     fn test_load_single_graph() {
-        let filename = r#"json\single-graph.json"#;
+        let filename = r#"tests\json\single-graph.json"#;
 
         match Graph::graph_from_file(&filename, true) {
             Ok(graph) => {
@@ -217,7 +209,7 @@ mod tests {
 
     #[test]
     fn test_load_graph() {
-        let filename = r#"json\single-graph.json"#;
+        let filename = r#"tests\json\single-graph.json"#;
 
         match Graph::graph_from_file(&filename, true) {
             Ok(graph) => {
@@ -234,10 +226,8 @@ mod tests {
                 let mut map: BTreeMap<String, (Vec<(&str, &str)>, usize)> = BTreeMap::new();
 
                 for edge in result.iter() {
-                    let key = format!(
-                        "{}->{}->{}",
-                        &edge.from_label, &edge.e_label, &edge.to_label
-                    );
+                    let key =
+                        format!("{}->{}->{}", &edge.from_label, &edge.e_label, &edge.to_label);
                     map.entry(key)
                         .and_modify(|v| {
                             v.0.push((&edge.from, &edge.to));

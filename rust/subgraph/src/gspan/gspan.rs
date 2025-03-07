@@ -1,28 +1,35 @@
-use rustc_hash::FxHashSet;
-use crate::gspan::misc::{
-    get_backward, get_forward_edges, get_forward_pure, get_forward_rm_path, inner_support, support,
+/*
+ * Copyright (c), Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ */
+use std::{
+    collections::BTreeMap,
+    fs::File,
+    io::{BufWriter, Write},
+    usize,
 };
-use crate::gspan::models::dfs_code::DFSCode;
-use crate::gspan::models::edge::Edge;
-use crate::gspan::models::graph::Graph;
-use crate::gspan::models::history::History;
-use crate::gspan::models::projected::Projected;
-use crate::gspan::models::vertex::Vertex;
-use crate::gspan::result::MaxDFSCodeGraphResult;
-use std::collections::BTreeMap;
-use std::fs::File;
-use std::io::{BufWriter, Write};
-use std::usize;
 
-use super::result::OutType;
+use rustc_hash::FxHashSet;
+
+use super::result::{OutSource, OutType};
+use crate::gspan::{
+    misc::{
+        get_backward, get_forward_edges, get_forward_pure, get_forward_rm_path, inner_support,
+        support,
+    },
+    models::{
+        dfs_code::DFSCode, edge::Edge, graph::Graph, history::History, projected::Projected,
+        vertex::Vertex,
+    },
+    result::MaxDFSCodeGraphResult,
+};
 
 pub struct GSpan {
-    trans: Vec<Graph>,      // 图列表
-    min_sup: usize,         // Min support, 相同结果在不同图中出现的最小次数
-    inner_min_sup: usize,   // 相同结构在同一图中出现的最小次数
-    max_pat_min: usize,     // Minimum number of patterns(vertices) to be output
-    max_pat_max: usize,     // Maximum number of patterns(vertices) to be output
-    directed: bool,         // 是否有向图
+    trans: Vec<Graph>,    // 图列表
+    min_sup: usize,       // Min support, 相同结果在不同图中出现的最小次数
+    inner_min_sup: usize, // 相同结构在同一图中出现的最小次数
+    max_pat_min: usize,   // Minimum number of patterns(vertices) to be output
+    max_pat_max: usize,   // Maximum number of patterns(vertices) to be output
+    directed: bool,       // 是否有向图
 }
 
 impl GSpan {
@@ -33,86 +40,61 @@ impl GSpan {
         max_pat_min: usize,
         max_pat_max: usize,
         directed: bool,
-        out_type: OutType,
     ) -> GSpan {
-        let singleton = MaxDFSCodeGraphResult::get_instance();
-        singleton.set_config(min_sup, inner_min_sup, max_pat_min, max_pat_max, out_type);
-        GSpan {
-            trans: graphs,
-            min_sup,
-            inner_min_sup,
-            max_pat_min,
-            max_pat_max,
-            directed,
-        }
+        GSpan { trans: graphs, min_sup, inner_min_sup, max_pat_min, max_pat_max, directed }
     }
 
-    pub fn new_with_out_path(
-        graphs: Vec<Graph>,
-        min_sup: usize,
-        inner_min_sup: usize,
-        max_pat_min: usize,
-        max_pat_max: usize,
-        directed: bool,
-        out_path: &str,
-        out_type: OutType,
-    ) -> GSpan {
-        let singleton = MaxDFSCodeGraphResult::get_instance();
-        singleton.set_config(min_sup, inner_min_sup, max_pat_min, max_pat_max, out_type);
-        singleton.set_stream(BufWriter::new(File::create(out_path).unwrap()));
-        GSpan {
-            trans: graphs,
-            min_sup,
-            inner_min_sup,
-            max_pat_min,
-            max_pat_max,
-            directed,
+    pub fn run<W: Write + Send + Sync + 'static>(
+        &self,
+        out_type: OutType,                // 输出类型
+        out_source: Option<OutSource<W>>, // 输出源
+        mut process: Option<W>,           // 过程数据输出位置
+    ) -> (usize, MaxDFSCodeGraphResult) {
+        // 0. Prepare the Result
+        let mut result = MaxDFSCodeGraphResult::default();
+        result.set_config(
+            self.min_sup,
+            self.inner_min_sup,
+            self.max_pat_min,
+            self.max_pat_max,
+            out_type,
+        );
+        if let Some(out_source) = out_source {
+            match out_source {
+                OutSource::Path(path) =>
+                    result.set_stream(BufWriter::new(File::create(path).unwrap())),
+                OutSource::Stream(stream) => result.set_stream(stream),
+                OutSource::Channel(sender) => result.set_channel(true, Some(sender)),
+            }
         }
-    }
 
-    #[allow(dead_code)]
-    pub fn new_with_stream<W: Write + Send + Sync + 'static>(
-        graphs: Vec<Graph>,
-        min_sup: usize,
-        inner_min_sup: usize,
-        max_pat_min: usize,
-        max_pat_max: usize,
-        directed: bool,
-        output: W,
-        out_type: OutType,
-    ) -> GSpan {
-        let singleton = MaxDFSCodeGraphResult::get_instance();
-        singleton.set_config(min_sup, inner_min_sup, max_pat_min, max_pat_max, out_type);
-        singleton.set_stream(output);
-        GSpan {
-            trans: graphs,
-            min_sup,
-            inner_min_sup,
-            max_pat_min,
-            max_pat_max,
-            directed,
-        }
-    }
-
-    pub fn run<W: Write + Send + Sync + 'static>(&self, process: &mut Option<W>) -> usize {
         // 1. Find single node frequent subgraph, if requested
         let mut single_vertex_graph_map: BTreeMap<
             usize,
-            BTreeMap<String, (FxHashSet<String>, usize)>> = BTreeMap::new();
+            BTreeMap<String, (FxHashSet<String>, usize)>,
+        > = BTreeMap::new();
         let mut single_vertex_label_frequent_map: BTreeMap<String, usize> = BTreeMap::new(); // 一个 graph 内重复的 vertex 的频繁度只记录一次
         if self.max_pat_min <= 1 {
-            self.find_frequent_single_vertex(&mut single_vertex_graph_map, &mut single_vertex_label_frequent_map);
+            self.find_frequent_single_vertex(
+                &mut single_vertex_graph_map,
+                &mut single_vertex_label_frequent_map,
+            );
         }
 
         // 2. Report the single vertex subgraphs
         let mut next_gid: usize = 0;
-        
-        self.print_frequent_single_vertex(&mut single_vertex_graph_map, &mut single_vertex_label_frequent_map,
-            &mut next_gid, process);
+
+        self.print_frequent_single_vertex(
+            &mut single_vertex_graph_map,
+            &mut single_vertex_label_frequent_map,
+            &mut next_gid,
+            &mut process,
+        );
 
         // 3. Subgraphs > Vertices
         // root: [from_label][e_label][to_label] -> Projected
-        let mut root: BTreeMap<String, BTreeMap<String, BTreeMap<String, Projected>>> = BTreeMap::new();
+        let mut root: BTreeMap<String, BTreeMap<String, BTreeMap<String, Projected>>> =
+            BTreeMap::new();
         for g in &self.trans {
             for from in &g.vertices {
                 let edges: Vec<&Edge> = get_forward_edges(&g, from);
@@ -121,9 +103,9 @@ impl GSpan {
                 }
                 for edge in &edges {
                     let key_1 = from.label.clone();
-                    let root_1 = root.entry(key_1).or_insert(BTreeMap::new());
+                    let root_1 = root.entry(key_1).or_default();
                     let key_2 = edge.e_label.clone();
-                    let root_2 = root_1.entry(key_2).or_insert(BTreeMap::new());
+                    let root_2 = root_1.entry(key_2).or_default();
                     let key_3 = g.find_vertex(&edge.to).unwrap().label.clone();
                     let root_3 = root_2.entry(key_3).or_insert(Projected::new());
                     root_3.push(g.id, edge, None);
@@ -141,16 +123,23 @@ impl GSpan {
                         e_label_key.to_string(),
                         to_label_key.to_string(),
                     );
-                    self.sub_mining(to_label_value, &mut dfs_code, &mut next_gid, process);
-                    dfs_code.pop_with_set_result(to_label_value);
+                    self.sub_mining(
+                        to_label_value,
+                        &mut dfs_code,
+                        &mut next_gid,
+                        &mut process,
+                        &mut result,
+                    );
+                    dfs_code.pop_with_set_result(to_label_value, &mut result);
                 }
             }
         }
-        next_gid
+        (next_gid, result)
     }
 
-    fn find_frequent_single_vertex(&self, single_vertex_graph_map: &mut BTreeMap<
-        usize, BTreeMap<String, (FxHashSet<String>, usize)>>,
+    fn find_frequent_single_vertex(
+        &self,
+        single_vertex_graph_map: &mut BTreeMap<usize, BTreeMap<String, (FxHashSet<String>, usize)>>,
         single_vertex_label_frequent_map: &mut BTreeMap<String, usize>,
     ) {
         for graph in &self.trans {
@@ -173,10 +162,12 @@ impl GSpan {
         }
     }
 
-    fn print_frequent_single_vertex<W: Write + Send + Sync + 'static>(&self, single_vertex_graph_map: &BTreeMap<
-            usize, BTreeMap<String, (FxHashSet<String>, usize)>,
-        >, single_vertex_label_frequent_map: &BTreeMap<String, usize>,
-        next_gid: &mut usize, process: &mut Option<W>,
+    fn print_frequent_single_vertex<W: Write + Send + Sync + 'static>(
+        &self,
+        single_vertex_graph_map: &BTreeMap<usize, BTreeMap<String, (FxHashSet<String>, usize)>>,
+        single_vertex_label_frequent_map: &BTreeMap<String, usize>,
+        next_gid: &mut usize,
+        process: &mut Option<W>,
     ) {
         for (frequent_label, sup) in single_vertex_label_frequent_map.iter() {
             // 判断图之间的支持度
@@ -188,14 +179,15 @@ impl GSpan {
                 .iter()
                 .map(|entry| {
                     entry.1.get(frequent_label).unwrap_or(&(FxHashSet::default(), 0)).clone()
-                }).collect();
+                })
+                .collect();
 
             // 计算图内部最小、最大支持度
             let mut min = usize::MAX;
             let mut max = usize::MIN;
             for (_, v) in mapped.iter() {
-                min = if min > *v { *v } else { min };
-                max = if max < *v { *v } else { max };
+                min = min.min(*v);
+                max = max.max(*v);
             }
 
             if max < self.inner_min_sup {
@@ -203,8 +195,8 @@ impl GSpan {
             }
 
             if let Some(process) = process {
-                let gid = next_gid.clone();
-                
+                let gid = *next_gid;
+
                 let mut g = Graph::new(gid, self.directed);
                 g.insert_vertex("result_0", frequent_label);
 
@@ -224,8 +216,13 @@ impl GSpan {
         }
     }
 
-    fn sub_mining<W: Write + Send + Sync + 'static>(&self, projected: &Projected, dfs_code: &mut DFSCode,
-        next_gid: &mut usize, process: &mut Option<W>,
+    fn sub_mining<W: Write + Send + Sync + 'static>(
+        &self,
+        projected: &Projected,
+        dfs_code: &mut DFSCode,
+        next_gid: &mut usize,
+        process: &mut Option<W>,
+        result: &mut MaxDFSCodeGraphResult,
     ) {
         if self.should_stop_mining(projected, dfs_code, next_gid, process) {
             return;
@@ -239,40 +236,56 @@ impl GSpan {
         let min_label = dfs_code.get_dfs(0).from_label.clone();
         let max_to_code = dfs_code.get_dfs(*min_rm_path.get(0).unwrap()).to.clone();
 
-        let (new_fwd_root, new_bck_root) = self.generate_next_root(projected, dfs_code,
-            &min_rm_path, &min_label, max_to_code);
+        let (new_fwd_root, new_bck_root) =
+            self.generate_next_root(projected, dfs_code, &min_rm_path, &min_label, max_to_code);
 
         // Test all extended substructures..
         // .. backward
         for (to_key, to_value) in new_bck_root.iter() {
             for (e_label_key, e_label_value) in to_value.iter() {
-                dfs_code.push(max_to_code, *to_key, Vertex::NIL_V_LABEL.to_string(),
-                    e_label_key.to_string(), Vertex::NIL_V_LABEL.to_string());
-                self.sub_mining(e_label_value, dfs_code, next_gid, process);
-                dfs_code.pop_with_set_result(e_label_value);
+                dfs_code.push(
+                    max_to_code,
+                    *to_key,
+                    Vertex::NIL_V_LABEL.to_string(),
+                    e_label_key.to_string(),
+                    Vertex::NIL_V_LABEL.to_string(),
+                );
+                self.sub_mining(e_label_value, dfs_code, next_gid, process, result);
+                dfs_code.pop_with_set_result(e_label_value, result);
             }
         }
         // .. forward
         for (from_key, from_value) in new_fwd_root.iter().rev() {
             for (e_label_key, e_label_value) in from_value.iter() {
                 for (to_label_key, to_label_value) in e_label_value.iter() {
-                    dfs_code.push(*from_key, max_to_code + 1, Vertex::NIL_V_LABEL.to_string(),
-                        e_label_key.to_string(), to_label_key.to_string());
-                    self.sub_mining(to_label_value, dfs_code, next_gid, process);
-                    dfs_code.pop_with_set_result(to_label_value);
-
+                    dfs_code.push(
+                        *from_key,
+                        max_to_code + 1,
+                        Vertex::NIL_V_LABEL.to_string(),
+                        e_label_key.to_string(),
+                        to_label_key.to_string(),
+                    );
+                    self.sub_mining(to_label_value, dfs_code, next_gid, process, result);
+                    dfs_code.pop_with_set_result(to_label_value, result);
                 }
             }
         }
     }
 
-    fn generate_next_root<'a>(&'a self, projected: &'a Projected<'a>, dfs_code: &DFSCode,
-        min_rm_path: &Vec<usize>, min_label: &str, max_to_code: usize,
-    ) -> (BTreeMap<usize, BTreeMap<String, BTreeMap<String, Projected<'a>>>>,
-        BTreeMap<usize, BTreeMap<String, Projected<'a>>>) {
-        
+    pub fn generate_next_root<'a>(
+        &'a self,
+        projected: &'a Projected<'a>,
+        dfs_code: &DFSCode,
+        min_rm_path: &Vec<usize>,
+        min_label: &str,
+        max_to_code: usize,
+    ) -> (
+        BTreeMap<usize, BTreeMap<String, BTreeMap<String, Projected<'a>>>>,
+        BTreeMap<usize, BTreeMap<String, Projected<'a>>>,
+    ) {
         // [from][e_label][to_label] -> Projected
-        let mut new_fwd_root: BTreeMap<usize, BTreeMap<String, BTreeMap<String, Projected>>> = BTreeMap::new();
+        let mut new_fwd_root: BTreeMap<usize, BTreeMap<String, BTreeMap<String, Projected>>> =
+            BTreeMap::new();
         // [to][e_label] -> Projected
         let mut new_bck_root: BTreeMap<usize, BTreeMap<String, Projected>> = BTreeMap::new();
 
@@ -283,43 +296,56 @@ impl GSpan {
 
             // backward
             for i in (0..min_rm_path.len()).rev() {
-                let e = get_backward(self.trans.get(gid).unwrap(),
+                let e = get_backward(
+                    self.trans.get(gid).unwrap(),
                     history.histories.get(*min_rm_path.get(i).unwrap()).unwrap(),
-                    history.histories.get(*min_rm_path.get(0).unwrap()).unwrap(), &history);
+                    history.histories.get(*min_rm_path.get(0).unwrap()).unwrap(),
+                    &history,
+                );
                 if let Some(e) = e {
                     let key_1 = dfs_code.get_dfs(*min_rm_path.get(i).unwrap()).from;
-                    let root_1 = new_bck_root.entry(key_1).or_insert(BTreeMap::new());
+                    let root_1 = new_bck_root.entry(key_1).or_default();
                     let key_2: &String = &e.e_label;
                     let root_2 = root_1.entry(key_2.to_string()).or_insert(Projected::new());
                     root_2.push(gid, e, Some(&a_projected));
                 }
             }
             // pure forward
-            let edges: Vec<&Edge> = get_forward_pure(self.trans.get(gid).unwrap(),
-                history.histories.get(*min_rm_path.get(0).unwrap()).unwrap(), &min_label, &history);
+            let edges: Vec<&Edge> = get_forward_pure(
+                self.trans.get(gid).unwrap(),
+                history.histories.get(*min_rm_path.get(0).unwrap()).unwrap(),
+                &min_label,
+                &history,
+            );
             if !edges.is_empty() {
                 for it in &edges {
-                    let root_1 = new_fwd_root.entry(max_to_code).or_insert(BTreeMap::new());
+                    let root_1 = new_fwd_root.entry(max_to_code).or_default();
                     let key_2: &String = &it.e_label;
-                    let root_2 = root_1.entry(key_2.to_string()).or_insert(BTreeMap::new());
-                    let key_3: &String = &self.trans.get(gid).unwrap().find_vertex(&it.to).unwrap().label;
+                    let root_2 = root_1.entry(key_2.to_string()).or_default();
+                    let key_3: &String =
+                        &self.trans.get(gid).unwrap().find_vertex(&it.to).unwrap().label;
                     let root_3 = root_2.entry(key_3.to_string()).or_insert(Projected::new());
                     root_3.push(gid, it, Some(&a_projected));
                 }
             }
             // backtracked forward
             for a_rm_path in min_rm_path {
-                let edges: Vec<&Edge> = get_forward_rm_path(self.trans.get(gid).unwrap(),
-                history.histories.get(*a_rm_path).unwrap(), &min_label, &history);
+                let edges: Vec<&Edge> = get_forward_rm_path(
+                    self.trans.get(gid).unwrap(),
+                    history.histories.get(*a_rm_path).unwrap(),
+                    &min_label,
+                    &history,
+                );
                 if edges.is_empty() {
                     continue;
                 }
                 for it in &edges {
                     let key_1 = dfs_code.get_dfs(*a_rm_path).from;
-                    let root_1 = new_fwd_root.entry(key_1).or_insert(BTreeMap::new());
+                    let root_1 = new_fwd_root.entry(key_1).or_default();
                     let key_2: &String = &it.e_label;
-                    let root_2 = root_1.entry(key_2.to_string()).or_insert(BTreeMap::new());
-                    let key_3: &String = &self.trans.get(gid).unwrap().find_vertex(&it.to).unwrap().label;
+                    let root_2 = root_1.entry(key_2.to_string()).or_default();
+                    let key_3: &String =
+                        &self.trans.get(gid).unwrap().find_vertex(&it.to).unwrap().label;
                     let root_3 = root_2.entry(key_3.to_string()).or_insert(Projected::new());
                     root_3.push(gid, it, Some(&a_projected));
                 }
@@ -328,8 +354,12 @@ impl GSpan {
         (new_fwd_root, new_bck_root)
     }
 
-    fn should_stop_mining<W: Write + Send + Sync + 'static>(&self, projected: &Projected, dfs_code: &mut DFSCode,
-        next_gid: &mut usize, process: &mut Option<W>,
+    fn should_stop_mining<W: Write + Send + Sync + 'static>(
+        &self,
+        projected: &Projected,
+        dfs_code: &mut DFSCode,
+        next_gid: &mut usize,
+        process: &mut Option<W>,
     ) -> bool {
         // Check if the pattern is frequent enough, between graphs
         let sup: usize = support(projected);
@@ -389,15 +419,16 @@ impl GSpan {
 
         // [from_label][e_label][to_label] -> Projected
         // BTreeMap 在 Rust 中会自动根据键进行排序
-        let mut root: BTreeMap<String, BTreeMap<String, BTreeMap<String, Projected>>> = BTreeMap::new();
+        let mut root: BTreeMap<String, BTreeMap<String, BTreeMap<String, Projected>>> =
+            BTreeMap::new();
 
         for from in &graph_is_min.vertices {
             let edges: Vec<&Edge> = get_forward_edges(&graph_is_min, from);
             for it in &edges {
                 let key_1 = &it.from_label;
-                let root_1 = root.entry(key_1.to_string()).or_insert(BTreeMap::new());
+                let root_1 = root.entry(key_1.to_string()).or_default();
                 let key_2 = &it.e_label;
-                let root_2 = root_1.entry(key_2.to_string()).or_insert(BTreeMap::new());
+                let root_2 = root_1.entry(key_2.to_string()).or_default();
                 let key_3 = &it.to_label;
                 let root_3 = root_2.entry(key_3.to_string()).or_insert(Projected::new());
                 // 创建初始化子图：一个 Edge 就是一个最小子图
@@ -412,9 +443,14 @@ impl GSpan {
         let e_label_map_value = e_label_map_entry.1;
         let to_label_map_entry = e_label_map_value.first_key_value().unwrap();
         let to_label_map_value = to_label_map_entry.1;
-        dfs_code_is_min.push(0, 1, from_label_map_entry.0.to_string(),
-            e_label_map_entry.0.to_string(), to_label_map_entry.0.to_string());
-        
+        dfs_code_is_min.push(
+            0,
+            1,
+            from_label_map_entry.0.to_string(),
+            e_label_map_entry.0.to_string(),
+            to_label_map_entry.0.to_string(),
+        );
+
         self.is_min_dfscode(to_label_map_value, dfs_code, &mut dfs_code_is_min, &graph_is_min)
     }
 
@@ -423,7 +459,11 @@ impl GSpan {
      * 以边序列遍历方式递归构造这幅图的最小 min-DFSCode
      * 每一步递归过程都对 DFSCode 序列合 min-DFSCode 序列进行对比，一旦有某个 DFSCode 不同，那么这个 DFSCode 就不是最小的，可以剪枝
      */
-    fn is_min_dfscode(&self, projected: &Projected, dfs_code: &DFSCode, dfs_code_is_min: &mut DFSCode,
+    fn is_min_dfscode(
+        &self,
+        projected: &Projected,
+        dfs_code: &DFSCode,
+        dfs_code_is_min: &mut DFSCode,
         graph_is_min: &Graph,
     ) -> bool {
         let min_rm_path = dfs_code_is_min.build_rm_path();
@@ -431,42 +471,73 @@ impl GSpan {
 
         {
             // backward 情况下是否最小: [e_label] -> Projected
-            let (root, new_to) = self.backward_expand(projected, dfs_code_is_min, graph_is_min, &min_rm_path);
+            let (root, new_to) =
+                self.backward_expand(projected, dfs_code_is_min, graph_is_min, &min_rm_path);
 
             if let Some(mut root) = root {
                 let e_label_map_entry = root.first_entry().unwrap();
-                dfs_code_is_min.push(max_to_code, new_to, Vertex::NIL_V_LABEL.to_string(),
-                    e_label_map_entry.key().to_string(), Vertex::NIL_V_LABEL.to_string());
+                dfs_code_is_min.push(
+                    max_to_code,
+                    new_to,
+                    Vertex::NIL_V_LABEL.to_string(),
+                    e_label_map_entry.key().to_string(),
+                    Vertex::NIL_V_LABEL.to_string(),
+                );
                 let len = dfs_code_is_min.dfs_vec.len();
                 if dfs_code.get_dfs(len - 1).ne(dfs_code_is_min.get_dfs(len - 1)) {
                     return false;
                 }
-                return self.is_min_dfscode(e_label_map_entry.get(), dfs_code, dfs_code_is_min, graph_is_min);
+                return self.is_min_dfscode(
+                    e_label_map_entry.get(),
+                    dfs_code,
+                    dfs_code_is_min,
+                    graph_is_min,
+                );
             }
         }
 
         {
             // forward 情况下是否最小
-            let (root, new_from) = self.forward_expand(projected, dfs_code_is_min, graph_is_min,
-                &min_rm_path, &max_to_code);
+            let (root, new_from) = self.forward_expand(
+                projected,
+                dfs_code_is_min,
+                graph_is_min,
+                &min_rm_path,
+                &max_to_code,
+            );
 
             if let Some(root) = root {
-                let (e_label_map_key, to_label_map_key, to_label_map_value) = self.get_first_entry_of_e_to_p(&root);
-                dfs_code_is_min.push(new_from, max_to_code + 1, Vertex::NIL_V_LABEL.to_string(),
-                    e_label_map_key.to_string(), to_label_map_key.to_string());
-                
+                let (e_label_map_key, to_label_map_key, to_label_map_value) =
+                    self.get_first_entry_of_e_to_p(&root);
+                dfs_code_is_min.push(
+                    new_from,
+                    max_to_code + 1,
+                    Vertex::NIL_V_LABEL.to_string(),
+                    e_label_map_key.to_string(),
+                    to_label_map_key.to_string(),
+                );
+
                 let len: usize = dfs_code_is_min.dfs_vec.len();
                 if dfs_code.get_dfs(len - 1).ne(dfs_code_is_min.get_dfs(len - 1)) {
                     return false;
                 }
-                return self.is_min_dfscode(to_label_map_value, dfs_code, dfs_code_is_min, graph_is_min);
+                return self.is_min_dfscode(
+                    to_label_map_value,
+                    dfs_code,
+                    dfs_code_is_min,
+                    graph_is_min,
+                );
             }
         }
         true
     }
 
-    fn backward_expand<'a>(&self, projected: &'a Projected, dfs_code_is_min: &mut DFSCode,
-        graph_is_min: &'a Graph, min_rm_path: &Vec<usize>,
+    fn backward_expand<'a>(
+        &self,
+        projected: &'a Projected,
+        dfs_code_is_min: &mut DFSCode,
+        graph_is_min: &'a Graph,
+        min_rm_path: &Vec<usize>,
     ) -> (Option<BTreeMap<String, Projected<'a>>>, usize) {
         let mut root: Option<BTreeMap<String, Projected>> = None;
         let mut new_to: usize = 0;
@@ -482,29 +553,36 @@ impl GSpan {
         (root, new_to)
     }
 
-    fn forward_expand<'a>(&self, projected: &'a Projected, dfs_code_is_min: &mut DFSCode,
-        graph_is_min: &'a Graph, min_rm_path: &Vec<usize>, max_to_code: &usize,
+    fn forward_expand<'a>(
+        &self,
+        projected: &'a Projected,
+        dfs_code_is_min: &mut DFSCode,
+        graph_is_min: &'a Graph,
+        min_rm_path: &Vec<usize>,
+        max_to_code: &usize,
     ) -> (Option<BTreeMap<String, BTreeMap<String, Projected<'a>>>>, usize) {
         let min_label = dfs_code_is_min.get_dfs(0).from_label.clone();
 
         let mut new_from: usize = 0;
-        let mut root: Option<BTreeMap<String, BTreeMap<String, Projected>>> =
-            self.generate_e_to_p_map(projected, graph_is_min, |history| {
-                let last_rm_path_edge = history.histories.get(*min_rm_path.get(0).unwrap()).unwrap();
+        let mut root: Option<BTreeMap<String, BTreeMap<String, Projected>>> = self
+            .generate_e_to_p_map(projected, graph_is_min, |history| {
+                let last_rm_path_edge =
+                    history.histories.get(*min_rm_path.get(0).unwrap()).unwrap();
                 get_forward_pure(graph_is_min, last_rm_path_edge, &min_label, &history)
             });
-        
+
         if root.is_some() {
             new_from = max_to_code.clone();
         } else {
             // min_rm_path 是从大到小的 dfs_vec 索引
             for i in 0..min_rm_path.len() {
                 root = self.generate_e_to_p_map(projected, graph_is_min, |history| {
-                    let cur_rm_path_edge = history.histories.get(*min_rm_path.get(i).unwrap()).unwrap();
+                    let cur_rm_path_edge =
+                        history.histories.get(*min_rm_path.get(i).unwrap()).unwrap();
                     get_forward_rm_path(graph_is_min, cur_rm_path_edge, &min_label, &history)
                 });
                 if root.is_some() {
-                    new_from  = dfs_code_is_min.get_dfs(*min_rm_path.get(i).unwrap()).from;
+                    new_from = dfs_code_is_min.get_dfs(*min_rm_path.get(i).unwrap()).from;
                     break;
                 }
             }
@@ -528,7 +606,7 @@ impl GSpan {
             let history: History = History::build(cur);
             // 获取最尾边重点到当前边起点的反向边
             let backward_edge = get_backward(
-                graph_is_min, 
+                graph_is_min,
                 history.histories.get(*min_rm_path.get(i).unwrap()).unwrap(), // 路径当前边
                 history.histories.get(*min_rm_path.get(0).unwrap()).unwrap(), // 路径最尾边
                 &history,
@@ -549,7 +627,9 @@ impl GSpan {
         graph_is_min: &'a Graph,
         generate_edges: F,
     ) -> Option<BTreeMap<String, BTreeMap<String, Projected<'a>>>>
-    where F: Fn(&History) -> Vec<&'a Edge> {
+    where
+        F: Fn(&History) -> Vec<&'a Edge>,
+    {
         // [e_label][to_label] -> Projected
         let mut root: BTreeMap<String, BTreeMap<String, Projected>> = BTreeMap::new();
 
@@ -559,7 +639,7 @@ impl GSpan {
             if !edges.is_empty() {
                 for it in edges {
                     let key_1 = it.e_label.clone();
-                    let root_1 = root.entry(key_1).or_insert(BTreeMap::new());
+                    let root_1 = root.entry(key_1).or_default();
                     let key_2 = graph_is_min.vertex_name_label_map.get(&it.to).unwrap();
                     let root_2 = root_1.entry(key_2.to_string()).or_insert(Projected::new());
                     root_2.push(0, it, Some(cur));
@@ -577,11 +657,7 @@ impl GSpan {
         let e_label_map_value = e_label_map_entry.1;
         let to_label_map_entry = e_label_map_value.first_key_value().unwrap();
         let to_label_map_value = to_label_map_entry.1;
-        (
-            e_label_map_entry.0,
-            to_label_map_entry.0,
-            to_label_map_value,
-        )
+        (e_label_map_entry.0, to_label_map_entry.0, to_label_map_value)
     }
 }
 
@@ -602,9 +678,8 @@ impl GSpan {
         if self.max_pat_min > 0 && g.vertices.len() < self.max_pat_min {
             return;
         }
-        out.write(
-            &*g.to_str_repr(Some((sup, min_inner_sup, max_inner_sup, total))).into_bytes()
-        ).unwrap();
+        out.write(&*g.to_str_repr(Some((sup, min_inner_sup, max_inner_sup, total))).into_bytes())
+            .unwrap();
         out.write(b"\n").unwrap();
         let vec: Vec<String> = names.into_iter().collect();
         out.write(&vec.join(",").into_bytes()).unwrap();
@@ -627,50 +702,40 @@ impl GSpan {
         if self.max_pat_min > 0 && dfs_code.count_node() < self.max_pat_min {
             return;
         }
-        
+
         let g = dfs_code.to_graph(gid, self.directed);
         out.write(b"-------\n").unwrap();
-        out.write(
-            &*g.to_str_repr(Some((sup, min_inner_sup, max_inner_sup, total))).into_bytes()
-        ).unwrap();
+        out.write(&*g.to_str_repr(Some((sup, min_inner_sup, max_inner_sup, total))).into_bytes())
+            .unwrap();
         out.write(b"\n").unwrap();
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::gspan::result::MaxDFSCodeGraphResult;
-
     use super::*;
 
     #[test]
     fn test_run_single_graph() {
         // JSON 文件路径
-        let filename = r#"json\single-graph.json"#;
+        let filename = r#"tests\json\single-graph.json"#;
 
         match Graph::graph_from_file(&filename, true) {
             Ok(graph) => {
                 println!("{}", graph.to_str_repr(None));
-                
-                let gspan = GSpan::new_with_out_path(
-                    vec![graph],
-                    1,
-                    2,
-                    1,
-                    10,
-                    true,
-                    "out-single.txt",
+
+                let gspan = GSpan::new(vec![graph], 1, 2, 1, 10, true);
+
+                let (subgraphs, result) = gspan.run(
                     OutType::TXT,
+                    Some(OutSource::Path("out-single.txt".to_string())),
+                    Some(BufWriter::new(File::create("out-process-single.txt").unwrap())),
                 );
 
-                let subgraphs = gspan.run(&mut Some(BufWriter::new(File::create("out-process-single.txt").unwrap())));
-
-                let singleton = MaxDFSCodeGraphResult::get_instance();
-                
                 assert_eq!(8, subgraphs);
-                assert_eq!(5, singleton.get_value_len());
-                assert_eq!(12, singleton.get_sum_subgraphs());
-            },
+                assert_eq!(5, result.get_value_len());
+                assert_eq!(12, result.get_sum_subgraphs());
+            }
             Err(err) => {
                 println!("Error: {}", err);
             }
@@ -680,34 +745,27 @@ mod tests {
     #[test]
     fn test_run_lenet_graph() {
         // JSON 文件路径
-        let filename = r#"json\lenet.json"#;
+        let filename = r#"tests\json\lenet.json"#;
 
         match Graph::graph_from_file(&filename, true) {
             Ok(graph) => {
                 println!("{}", graph.to_str_repr(None));
-                
+
                 let file = File::create("out-t.txt").unwrap();
                 let buffered_writer = BufWriter::new(file);
 
-                let gspan = GSpan::new_with_stream(
-                    vec![graph],
-                    1,
-                    2,
-                    1,
-                    10,
-                    true,
-                    buffered_writer,
+                let gspan = GSpan::new(vec![graph], 1, 2, 1, 10, true);
+
+                let (subgraphs, result) = gspan.run(
                     OutType::TXT,
+                    Some(OutSource::Stream(buffered_writer)),
+                    Some(BufWriter::new(File::create("out-t-process.txt").unwrap())),
                 );
 
-                let subgraphs = gspan.run(&mut Some(BufWriter::new(File::create("out-t-process.txt").unwrap())));
-
-                let singleton = MaxDFSCodeGraphResult::get_instance();
-                
                 assert_eq!(10, subgraphs);
-                assert_eq!(2, singleton.get_value_len());
-                assert_eq!(4, singleton.get_sum_subgraphs());
-            },
+                assert_eq!(2, result.get_value_len());
+                assert_eq!(4, result.get_sum_subgraphs());
+            }
             Err(err) => {
                 println!("Error: {}", err);
             }

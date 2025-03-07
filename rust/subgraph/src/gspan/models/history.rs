@@ -1,6 +1,9 @@
-use crate::gspan::models::edge::Edge;
-use crate::gspan::models::prev_dfs::PrevDFS;
+/*
+ * Copyright (c), Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ */
 use rustc_hash::FxHashSet;
+
+use crate::gspan::models::{edge::Edge, prev_dfs::PrevDFS};
 
 /**
  * 在递归函数中，根据当前 DFSCode 构造出的 rmpath 保存了最右路径上的节点索引，我们需要根据这些索引找到原图中最右路径上的边的指针。

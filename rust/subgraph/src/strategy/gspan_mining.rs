@@ -1,19 +1,30 @@
+/*
+ * Copyright (c), Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+ */
 use std::{
-    fs::{File, OpenOptions}, io::{BufWriter, Read, Seek, Write}, sync::mpsc::{self, Receiver, Sender}, thread, time::Instant
+    fs::{File, OpenOptions},
+    io::{BufWriter, Read, Seek, Write},
+    sync::mpsc::{self, Receiver, Sender},
+    thread,
+    time::Instant,
 };
 
-use crate::{gspan::{
-    gspan::GSpan,
-    models::graph::Graph,
-    result::{JSONResult, MaxDFSCodeGraphResult, OutType},
-}, strategy::config::{InputSource, OutputPath, ProcessPath}};
-
 use super::mining_strategy::MiningStrategy;
+use crate::{
+    gspan::{
+        gspan::GSpan,
+        models::graph::Graph,
+        result::{JSONResult, OutType},
+    },
+    result::OutSource,
+    strategy::config::InputSource,
+};
 
 pub struct GSpanMining;
 
 impl MiningStrategy for GSpanMining {
     fn run(&self, args: super::Config) -> Vec<JSONResult> {
+        let now = Instant::now();
         let graphs = match args.get_input_source() {
             InputSource::File(input_file) => {
                 let graph = Graph::graph_from_file(&input_file, false);
@@ -24,33 +35,51 @@ impl MiningStrategy for GSpanMining {
             }
             InputSource::Graphs(graphs) => graphs.to_vec(),
         };
+        for graph in graphs.iter() {
+            println!(
+                "All good parsing input file. vertex: {}, edge: {}.",
+                graph.vertices.len(),
+                graph.edge_size
+            );
+        }
+        let alpha = now.elapsed().as_millis();
+        println!("Took {}ms", alpha);
 
-        let gspan = match args.get_output_path() {
-            OutputPath::File(file) => GSpan::new_with_out_path(graphs, args.get_min_support(),
-                args.get_min_inner_support(), args.get_min_vertices(), args.get_max_vertices(), true, file,
-                args.get_output_type().clone()
-            ),
-            OutputPath::None => GSpan::new(graphs, args.get_min_support(), args.get_min_inner_support(),
-                args.get_min_vertices(), args.get_max_vertices(), true, args.get_output_type().clone(),
-            ),
-        };
-
-        let mut process_writer: Option<BufWriter<File>> = match args.get_process_path() {
-            ProcessPath::None => None,
-            ProcessPath::File(file) => Some(BufWriter::new(File::create(file).unwrap())),
-        };
-
-        let subgraphs = gspan.run(&mut process_writer);
-        println!("Found {} subgraphs", subgraphs);
-        let singleton = MaxDFSCodeGraphResult::get_instance();
-        println!(
-            "Found {}/{} subgraphs (Only Max)",
-            singleton.get_value_len(),
-            singleton.get_sum_subgraphs()
+        println!("Mining subgraphs..");
+        let gspan = GSpan::new(
+            graphs,
+            args.get_min_support(),
+            args.get_min_inner_support(),
+            args.get_min_vertices(),
+            args.get_max_vertices(),
+            true,
         );
 
+        let process_writer: Option<BufWriter<File>> = match args.get_process_path() {
+            Some(file) => Some(BufWriter::new(File::create(file).unwrap())),
+            None => None,
+        };
+
+        let output_source = match args.get_output_path() {
+            Some(file) => Some(OutSource::Path(file.to_string())),
+            None => None,
+        };
+
+        let (subgraphs, result) =
+            gspan.run(args.get_output_type().clone(), output_source, process_writer);
+        let delta = now.elapsed().as_millis();
+        println!("Finished.");
+        println!("Found {} subgraphs", subgraphs);
+        println!(
+            "Found {}/{} subgraphs (Only Max)",
+            result.get_value_len(),
+            result.get_sum_subgraphs()
+        );
+        println!("Took {}ms", delta - alpha);
+        println!("Total Took {}ms", delta);
+
         fix_json_file(args.get_output_path(), args.get_output_type());
-        singleton.get_result()
+        result.get_result()
     }
 
     fn run_channel(&self, args: super::Config) -> Receiver<String> {
@@ -66,45 +95,60 @@ impl MiningStrategy for GSpanMining {
             InputSource::Graphs(graphs) => graphs.to_vec(),
         };
         for graph in graphs.iter() {
-            println!("All good parsing input file. vertex: {}, edge: {}.", graph.vertices.len(), graph.edge_size);
+            println!(
+                "All good parsing input file. vertex: {}, edge: {}.",
+                graph.vertices.len(),
+                graph.edge_size
+            );
         }
         let alpha = now.elapsed().as_millis();
         println!("Took {}ms", alpha);
 
         println!("Mining subgraphs..");
-        let gspan = match args.get_output_path() {
-            OutputPath::File(file) => GSpan::new_with_out_path(graphs, args.get_min_support(),
-                args.get_min_inner_support(), args.get_min_vertices(), args.get_max_vertices(), true, file,
-                args.get_output_type().clone(),
-            ),
-            OutputPath::None => GSpan::new(graphs, args.get_min_support(), args.get_min_inner_support(),
-                args.get_min_vertices(), args.get_max_vertices(), true, args.get_output_type().clone(),
-            ),
-        };
+        let gspan = GSpan::new(
+            graphs,
+            args.get_min_support(),
+            args.get_min_inner_support(),
+            args.get_min_vertices(),
+            args.get_max_vertices(),
+            true,
+        );
+
+        // let gspan = match args.get_output_path() {
+        //     Some(file) => GSpan::new_with_out_path(graphs, args.get_min_support(),
+        //         args.get_min_inner_support(), args.get_min_vertices(), args.get_max_vertices(), true, file,
+        //         args.get_output_type().clone(),
+        //     ),
+        //     None => GSpan::new(graphs, args.get_min_support(), args.get_min_inner_support(),
+        //         args.get_min_vertices(), args.get_max_vertices(), true, args.get_output_type().clone(),
+        //     ),
+        // };
         let (tx, rx): (Sender<String>, Receiver<String>) = mpsc::channel();
 
         let process_path = (*args.get_process_path()).clone();
+        let output_type = args.get_output_type().clone();
         thread::spawn(move || {
-            let singleton = MaxDFSCodeGraphResult::get_instance();
-            singleton.set_channel(true, Some(tx));
+            // let singleton = MaxDFSCodeGraphResult::get_instance();
+            // singleton.set_channel(true, Some(tx));
 
-            let mut process_writer: Option<BufWriter<File>> = match process_path {
-                ProcessPath::None => None,
-                ProcessPath::File(file) => Some(BufWriter::new(File::create(file).unwrap())),
+            let process_writer: Option<BufWriter<File>> = match process_path {
+                None => None,
+                Some(file) => Some(BufWriter::new(File::create(file).unwrap())),
             };
 
-            let subgraphs = gspan.run(&mut process_writer);
+            let (subgraphs, mut result) =
+                gspan.run(output_type, Some(OutSource::Channel(tx)), process_writer);
             let delta = now.elapsed().as_millis();
             println!("Finished.");
             println!("Found {} subgraphs", subgraphs);
             println!(
                 "Found {}/{} subgraphs (Only Max)",
-                singleton.get_value_len(),
-                singleton.get_sum_subgraphs()
+                result.get_value_len(),
+                result.get_sum_subgraphs()
             );
             println!("Took {}ms", delta - alpha);
             println!("Total Took {}ms", delta);
-            singleton.drop_sender();
+            result.drop_sender();
         });
 
         fix_json_file(args.get_output_path(), args.get_output_type());
@@ -112,16 +156,12 @@ impl MiningStrategy for GSpanMining {
     }
 }
 
-fn fix_json_file(output_path: &OutputPath, output_type: &OutType) {
+fn fix_json_file(output_path: &Option<String>, output_type: &OutType) {
     match &output_type {
         OutType::JSON => {
-            if let OutputPath::File(filename) = &output_path {
+            if let Some(filename) = &output_path {
                 // 打开文件并读取内容
-                let mut file = OpenOptions::new()
-                    .read(true)
-                    .write(true)
-                    .open(filename)
-                    .unwrap();
+                let mut file = OpenOptions::new().read(true).write(true).open(filename).unwrap();
 
                 let mut contents = String::new();
                 file.read_to_string(&mut contents).unwrap();
@@ -145,13 +185,12 @@ fn fix_json_file(output_path: &OutputPath, output_type: &OutType) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gspan::result::{MaxDFSCodeGraphResult, OutType};
-    use crate::strategy::Config;
+    use crate::{gspan::result::OutType, strategy::Config};
 
     #[test]
     fn test_run_lenet_graph() {
         // JSON 文件路径
-        let filename = r#"json\lenet.json"#;
+        let filename = r#"tests\json\lenet.json"#;
 
         let gspan_mining = GSpanMining;
 
@@ -168,10 +207,8 @@ mod tests {
             Ok(config) => {
                 let result = gspan_mining.run(config);
 
-                let singleton = MaxDFSCodeGraphResult::get_instance();
-
-                assert_eq!(2, singleton.get_value_len());
-                assert_eq!(4, singleton.get_sum_subgraphs());
+                assert_eq!(2, result.len());
+                assert_eq!(4, result.iter().map(|r| r.instances.len()).sum::<usize>());
                 println!("{:?}", result);
             }
             Err(e) => eprintln!("Failed to create config: {:?}", e),
@@ -181,7 +218,7 @@ mod tests {
     #[test]
     fn test_run_lenet_graph_parsed() {
         // JSON 文件路径
-        let graph = Graph::graph_from_file(r#"json\lenet.json"#, true).unwrap();
+        let graph = Graph::graph_from_file(r#"tests\json\lenet.json"#, true).unwrap();
 
         let gspan_mining = GSpanMining;
 
@@ -198,10 +235,8 @@ mod tests {
             Ok(config) => {
                 let result = gspan_mining.run(config);
 
-                let singleton = MaxDFSCodeGraphResult::get_instance();
-
-                assert_eq!(2, singleton.get_value_len());
-                assert_eq!(4, singleton.get_sum_subgraphs());
+                assert_eq!(2, result.len());
+                assert_eq!(4, result.iter().map(|r| r.instances.len()).sum::<usize>());
                 println!("{:?}", result);
             }
             Err(e) => eprintln!("Failed to create config: {:?}", e),
@@ -211,20 +246,11 @@ mod tests {
     #[test]
     fn test_run_channel_lenet_graph() {
         // JSON 文件路径
-        let filename = r#"json\lenet.json"#;
+        let filename = r#"tests\json\lenet.json"#;
 
         let gspan_mining = GSpanMining;
 
-        match Config::new(
-            filename,
-            None,
-            None,
-            OutType::TXT,
-            1,
-            2,
-            1,
-            10,
-        ) {
+        match Config::new(filename, None, None, OutType::TXT, 1, 2, 1, 10) {
             Ok(config) => {
                 let rx = gspan_mining.run_channel(config);
 
